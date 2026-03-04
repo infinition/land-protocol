@@ -6,6 +6,9 @@
 # For a library (like land-protocol), it is usually kept out of git.
 Cargo.lock
 
+# Claude local files
+.claude/
+
 # IDEs
 .idea/
 .vscode/

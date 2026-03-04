@@ -2,52 +2,58 @@
 <img height="300" alt="image" src="https://github.com/user-attachments/assets/32aae849-064a-40eb-b83e-170713664034" />
 </div>
 
-
-#  LAND Protocol (Local AI Network Discovery)
+# LAND Protocol (Local AI Network Discovery)
 
 > **"The HDMI of AI"**
 
 A lightweight, local-first protocol for automatic discovery and communication between AI nodes on a local network.
 
-
 ## Why LAND?
 
-In the current AI landscape, hardware is often siloed or cloud-dependent. **LAND** (Local AI Network Discovery) is an open standard that allows any device-from a tiny ESP32 to a multi-GPU server-to join a local "Collective Intelligence" without configuration, API keys, or internet access.
+In the current AI landscape, hardware is often siloed or cloud-dependent. **LAND** is an open standard that allows any device (from a tiny ESP32 to a multi-GPU server) to join a local collective intelligence with no API keys and no internet requirement.
 
-- **Découverte :** mDNS sur le port UDP **5353** (assurez-vous qu'il soit ouvert sur votre machine).
-- **Transport :** TCP pour l'API cognitive (port par défaut 8419).
+- **Discovery:** mDNS on UDP port **5353**.
+- **Transport:** TCP for the cognitive API (default port **8419**).
 
-It separates the **Standard** from the **Product**:
-- **LAND (The Standard):** An open language for AI nodes to find and talk to each other.
-- **LaRuche (The Product):** A premium implementation of this protocol.
+LAND separates:
 
-## Core Features
+- **LAND (the standard):** an open protocol for local AI node discovery and communication.
+- **LaRuche (the product):** a concrete implementation of that protocol.
 
-- **Zero-Config Discovery:** Uses mDNS/DNS-SD to find peers instantly on the local network.
-- **Cognitive Manifest:** Every node broadcasts a rich profile:
-    - **Physical Identity:** Node name, hardware tier (Nano, Core, Pro, Max).
-    - **Intelligence Menu:** Available models (LLM, VLM, RAG, Audio, Code).
-    - **Real-time Load:** Queue depth and tokens per second throughput.
-- **Proof of Proximity:** Secure physical-based authentication (NFC/Button press).
-- **Swarm Intelligence:** Built-in logic for resource sharing and resilience.
-- **Priority QoS:** Dedicated lanes for critical inference tasks.
+## Core features
 
-##  How it works
+- **Zero-config discovery:** mDNS/DNS-SD peer discovery on LAN.
+- **Cognitive manifest:** each node broadcasts identity, capabilities, and load.
+- **Proof of proximity:** local trust/auth primitives.
+- **Swarm intelligence:** peer state and resilience helpers.
+- **Priority QoS:** request prioritization primitives.
 
-The protocol identifies nodes via the mDNS service type `_ai-inference._tcp.local.`. Each node broadcasts a Gzipped JSON payload (the **Cognitive Manifest**) containing its current state. 
+## How it works
 
-Clients (apps, SDKs) listen for these broadcasts to build a real-time map of available local intelligence.
+Nodes advertise using `_ai-inference._tcp.local.` and expose key metadata through TXT records.
+Clients and peers listen to these announcements and build a live map of available intelligence.
 
-##  Usage
+## Current implementation notes
 
-### Add as a dependency
+- Listener stale timeout is `45s`.
+- `ServiceRemoved` events are treated as transient hints; eviction is timeout-based.
+- `PartialManifest::api_url()` and `dashboard_url()` are IPv6-safe.
+- URL helpers:
+  - `land_protocol::format_host_for_url(host)`
+  - `land_protocol::endpoint_url(host, port, tls)`
+- `qos::RequestQueue::dequeue()` marks requests as active; call `complete(qos)` when processing ends.
+- `swarm::heartbeat()` promotes `Syncing`, `Suspect`, and `Down` peers back to `Active`.
+
+## Usage
+
+### Add as dependency
+
 ```toml
 [dependencies]
 land-protocol = { git = "https://github.com/infinition/land-protocol" }
 ```
 
-### 1. Discovering Nodes (Client side)
-Use this if you are building an app or service that wants to use available AI nodes.
+### 1. Discovering nodes (client side)
 
 ```rust
 use land_protocol::discovery::LandListener;
@@ -71,7 +77,7 @@ async fn main() {
 }
 ```
 
-### Broadcaster
+### 2. Broadcasting a node (server side)
 
 ```rust
 use land_protocol::discovery::LandBroadcaster;
@@ -92,15 +98,8 @@ async fn main() {
 }
 ```
 
-## URL helpers
-
-- `land_protocol::format_host_for_url(host)`
-- `land_protocol::endpoint_url(host, port, tls)`
-
-These helpers bracket raw IPv6 hosts automatically.
-
 ## Notes for integrators
 
-- `PartialManifest::api_url()` and `dashboard_url()` use IPv6-safe URL formatting.
-- `qos::RequestQueue::dequeue()` now marks requests as active; call `complete(qos)` when done.
-- `swarm::heartbeat()` promotes `Syncing/Suspect/Down` peers back to `Active`.
+- Prefer `PartialManifest::api_url()` / `dashboard_url()` over manual string formatting.
+- Use URL helpers for direct endpoint building, especially with IPv6 hosts.
+- If you use `RequestQueue`, pair `dequeue()` with `complete(qos)`.
