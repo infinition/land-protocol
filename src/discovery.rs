@@ -1,0 +1,311 @@
+//! mDNS-based discovery for the LAND protocol.
+//!
+//! Uses DNS-SD (Service Discovery) over multicast DNS to broadcast
+//! and discover LaRuche nodes on the local network. Every 2 seconds,
+//! each LaRuche node broadcasts its Cognitive Manifest.
+
+use crate::error::LandError;
+use crate::manifest::{CognitiveManifest, PartialManifest};
+use crate::SERVICE_TYPE;
+use mdns_sd::{ServiceDaemon, ServiceEvent, ServiceInfo};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::{watch, RwLock};
+use tracing::{debug, info, warn};
+use uuid::Uuid;
+
+/// Broadcasts this LaRuche node's presence on the local network via mDNS.
+pub struct LandBroadcaster {
+    daemon: ServiceDaemon,
+    service_fullname: Option<String>,
+    node_id: Uuid,
+}
+
+impl LandBroadcaster {
+    /// Create a new broadcaster for the given manifest.
+    pub fn new() -> Result<Self, LandError> {
+        let daemon = ServiceDaemon::new()?;
+        Ok(Self {
+            daemon,
+            service_fullname: None,
+            node_id: Uuid::new_v4(),
+        })
+    }
+
+    /// Register this node on the network with the given manifest.
+    pub fn register(&mut self, manifest: &CognitiveManifest) -> Result<(), LandError> {
+        let instance_name = format!("laruche-{}", &manifest.node_id.to_string()[..8]);
+
+        // Build TXT record properties from the manifest
+        let properties: Vec<(&str, &str)> = Vec::new();
+        let txt_props = manifest.to_txt_properties();
+        let txt_refs: Vec<(&str, &str)> = txt_props
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .collect();
+
+        let service_info = ServiceInfo::new(
+            SERVICE_TYPE,
+            &instance_name,
+            &format!("{}.local.", manifest.node_name),
+            &manifest.api_endpoint.host,
+            manifest.api_endpoint.port,
+            &txt_refs[..],
+        )?;
+
+        self.service_fullname = Some(service_info.get_fullname().to_string());
+        self.node_id = manifest.node_id;
+        self.daemon.register(service_info)?;
+
+        info!(
+            node_id = %manifest.node_id,
+            name = %manifest.node_name,
+            port = manifest.api_endpoint.port,
+            "LAND: Node registered on network"
+        );
+
+        Ok(())
+    }
+
+    /// Update the broadcast with fresh manifest data (e.g., new load metrics).
+    pub fn update(&self, manifest: &CognitiveManifest) -> Result<(), LandError> {
+        if let Some(ref fullname) = self.service_fullname {
+            let instance_name = format!("laruche-{}", &manifest.node_id.to_string()[..8]);
+            let txt_props = manifest.to_txt_properties();
+            let txt_refs: Vec<(&str, &str)> = txt_props
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.as_str()))
+                .collect();
+
+            let service_info = ServiceInfo::new(
+                SERVICE_TYPE,
+                &instance_name,
+                &format!("{}.local.", manifest.node_name),
+                &manifest.api_endpoint.host,
+                manifest.api_endpoint.port,
+                &txt_refs[..],
+            )?;
+
+            self.daemon.register(service_info)?;
+            debug!(node_id = %self.node_id, "LAND: Manifest updated");
+        }
+        Ok(())
+    }
+
+    /// Unregister from the network (graceful shutdown).
+    pub fn unregister(&self) -> Result<(), LandError> {
+        if let Some(ref fullname) = self.service_fullname {
+            self.daemon.unregister(fullname)?;
+            info!(node_id = %self.node_id, "LAND: Node unregistered from network");
+        }
+        Ok(())
+    }
+}
+
+impl Drop for LandBroadcaster {
+    fn drop(&mut self) {
+        let _ = self.unregister();
+        let _ = self.daemon.shutdown();
+    }
+}
+
+/// Discovered node on the network.
+#[derive(Debug, Clone)]
+pub struct DiscoveredNode {
+    pub manifest: PartialManifest,
+    pub discovered_at: chrono::DateTime<chrono::Utc>,
+    pub last_seen: chrono::DateTime<chrono::Utc>,
+}
+
+/// Listens for LaRuche nodes on the local network via mDNS.
+pub struct LandListener {
+    daemon: ServiceDaemon,
+    nodes: Arc<RwLock<HashMap<String, DiscoveredNode>>>,
+    shutdown_tx: Option<watch::Sender<bool>>,
+}
+
+impl LandListener {
+    /// Create a new listener.
+    pub fn new() -> Result<Self, LandError> {
+        let daemon = ServiceDaemon::new()?;
+        Ok(Self {
+            daemon,
+            nodes: Arc::new(RwLock::new(HashMap::new())),
+            shutdown_tx: None,
+        })
+    }
+
+    /// Start listening for LaRuche nodes in the background.
+    /// Returns a handle to the discovered nodes map.
+    pub fn start(&mut self) -> Result<Arc<RwLock<HashMap<String, DiscoveredNode>>>, LandError> {
+        let receiver = self.daemon.browse(SERVICE_TYPE)?;
+        let nodes = self.nodes.clone();
+        let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
+        self.shutdown_tx = Some(shutdown_tx);
+
+        let daemon = self.daemon.clone();
+
+        tokio::spawn(async move {
+            info!("LAND: Listening for LaRuche nodes on the network...");
+
+            loop {
+                tokio::select! {
+                    _ = shutdown_rx.changed() => {
+                        if *shutdown_rx.borrow() {
+                            info!("LAND: Listener shutting down");
+                            break;
+                        }
+                    }
+                    event = tokio::task::spawn_blocking({
+                        let receiver = receiver.clone();
+                        move || receiver.recv()
+                    }) => {
+                        match event {
+                            Ok(Ok(event)) => {
+                                Self::handle_event(&nodes, event).await;
+                            }
+                            Ok(Err(e)) => {
+                                warn!("LAND: mDNS receive error: {e}");
+                            }
+                            Err(e) => {
+                                warn!("LAND: Task error: {e}");
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        Ok(self.nodes.clone())
+    }
+
+    async fn handle_event(
+        nodes: &Arc<RwLock<HashMap<String, DiscoveredNode>>>,
+        event: ServiceEvent,
+    ) {
+        match event {
+            ServiceEvent::ServiceResolved(info) => {
+                let host = info
+                    .get_addresses()
+                    .iter()
+                    .next()
+                    .map(|a| a.to_string())
+                    .unwrap_or_default();
+
+                let properties: Vec<(String, String)> = info
+                    .get_properties()
+                    .iter()
+                    .map(|p| (p.key().to_string(), p.val_str().to_string()))
+                    .collect();
+
+                if let Some(manifest) = CognitiveManifest::from_txt_properties(&properties, &host)
+                {
+                    let node_key = manifest
+                        .node_id
+                        .map(|id| id.to_string())
+                        .unwrap_or_else(|| info.get_fullname().to_string());
+
+                    let name = manifest
+                        .node_name
+                        .clone()
+                        .unwrap_or_else(|| "unknown".to_string());
+
+                    info!(
+                        name = %name,
+                        host = %host,
+                        capabilities = ?manifest.capabilities,
+                        "LAND: Discovered LaRuche node"
+                    );
+
+                    let mut nodes = nodes.write().await;
+                    let now = chrono::Utc::now();
+                    nodes
+                        .entry(node_key)
+                        .and_modify(|n| {
+                            n.manifest = manifest.clone();
+                            n.last_seen = now;
+                        })
+                        .or_insert(DiscoveredNode {
+                            manifest,
+                            discovered_at: now,
+                            last_seen: now,
+                        });
+                }
+            }
+            ServiceEvent::ServiceRemoved(_, fullname) => {
+                info!(service = %fullname, "LAND: LaRuche node left the network");
+                let mut nodes = nodes.write().await;
+                nodes.retain(|_, n| {
+                    n.manifest
+                        .node_name
+                        .as_deref()
+                        .map(|name| !fullname.contains(name))
+                        .unwrap_or(true)
+                });
+            }
+            ServiceEvent::SearchStarted(_) => {
+                debug!("LAND: Search started");
+            }
+            _ => {}
+        }
+    }
+
+    /// Get a snapshot of all currently discovered nodes.
+    pub async fn get_nodes(&self) -> HashMap<String, DiscoveredNode> {
+        self.nodes.read().await.clone()
+    }
+
+    /// Find nodes matching specific capabilities.
+    pub async fn find_by_capabilities(
+        &self,
+        required: &[crate::capabilities::Capability],
+    ) -> Vec<DiscoveredNode> {
+        let nodes = self.nodes.read().await;
+        nodes
+            .values()
+            .filter(|n| {
+                required
+                    .iter()
+                    .all(|cap| n.manifest.capabilities.contains(cap))
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Find the best node for a given capability based on load and speed.
+    pub async fn find_best(
+        &self,
+        capability: crate::capabilities::Capability,
+    ) -> Option<DiscoveredNode> {
+        let candidates = self.find_by_capabilities(&[capability]).await;
+        candidates
+            .into_iter()
+            .min_by(|a, b| {
+                // Prefer: lower queue depth, then higher tokens/sec
+                let queue_a = a.manifest.queue_depth.unwrap_or(u32::MAX);
+                let queue_b = b.manifest.queue_depth.unwrap_or(u32::MAX);
+                queue_a
+                    .cmp(&queue_b)
+                    .then_with(|| {
+                        let tps_a = a.manifest.tokens_per_sec.unwrap_or(0.0);
+                        let tps_b = b.manifest.tokens_per_sec.unwrap_or(0.0);
+                        tps_b.partial_cmp(&tps_a).unwrap_or(std::cmp::Ordering::Equal)
+                    })
+            })
+    }
+
+    /// Stop listening.
+    pub fn stop(&mut self) {
+        if let Some(tx) = self.shutdown_tx.take() {
+            let _ = tx.send(true);
+        }
+    }
+}
+
+impl Drop for LandListener {
+    fn drop(&mut self) {
+        self.stop();
+        let _ = self.daemon.shutdown();
+    }
+}
