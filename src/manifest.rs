@@ -245,6 +245,12 @@ impl CognitiveManifest {
             props.push((flag, "1".to_string()));
         }
 
+        // Add primary model name for LAND discovery (clients can display / route by model)
+        if let Some(first_cap) = self.capabilities.capabilities.first() {
+            let model = first_cap.model_name.chars().take(64).collect::<String>();
+            props.push(("model".to_string(), model));
+        }
+
         // Add temperature if available
         if let Some(temp) = self.resources.temperature_c {
             props.push(("temp_c".to_string(), format!("{:.1}", temp)));
@@ -275,6 +281,7 @@ impl CognitiveManifest {
             port: None,
             dashboard_port: None,
             capabilities: Vec::new(),
+            model: None,
             temperature_c: None,
             in_swarm: false,
             peer_count: 0,
@@ -293,6 +300,7 @@ impl CognitiveManifest {
                 "queue" => manifest.queue_depth = value.parse().ok(),
                 "port" => manifest.port = value.parse().ok(),
                 "dash_port" => manifest.dashboard_port = value.parse().ok(),
+                "model" => manifest.model = Some(value.clone()),
                 "temp_c" => manifest.temperature_c = value.parse().ok(),
                 "swarm" => manifest.in_swarm = value == "1",
                 "peers" => manifest.peer_count = value.parse().unwrap_or(0),
@@ -339,6 +347,8 @@ pub struct PartialManifest {
     pub port: Option<u16>,
     pub dashboard_port: Option<u16>,
     pub capabilities: Vec<crate::capabilities::Capability>,
+    /// Primary model name broadcast via TXT (e.g. "mistral", "deepseek-coder")
+    pub model: Option<String>,
     pub temperature_c: Option<f32>,
     pub in_swarm: bool,
     pub peer_count: u32,
