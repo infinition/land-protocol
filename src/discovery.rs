@@ -13,7 +13,7 @@ use std::sync::Arc;
 use tokio::sync::{watch, RwLock};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
-const NODE_STALE_TIMEOUT_SECS: i64 = 15;
+const NODE_STALE_TIMEOUT_SECS: i64 = 45;
 
 /// Broadcasts this LaRuche node's presence on the local network via mDNS.
 pub struct LandBroadcaster {
@@ -191,8 +191,15 @@ impl LandListener {
                 let host = info
                     .get_addresses()
                     .iter()
-                    .next()
                     .map(|a| a.to_string())
+                    .find(|a| a.parse::<std::net::Ipv4Addr>().is_ok())
+                    .or_else(|| {
+                        info.get_addresses()
+                            .iter()
+                            .map(|a| a.to_string())
+                            .find(|a| !a.starts_with("fe80"))
+                    })
+                    .or_else(|| info.get_addresses().iter().next().map(|a| a.to_string()))
                     .unwrap_or_default();
 
                 let properties: Vec<(String, String)> = info
@@ -238,25 +245,13 @@ impl LandListener {
                 }
             }
             ServiceEvent::ServiceRemoved(_, fullname) => {
-                info!(service = %fullname, "LAND: LaRuche node left the network");
-                let mut nodes = nodes.write().await;
-                let instance = fullname.split('.').next().unwrap_or_default();
-                let node_id_hint = instance.strip_prefix("laruche-");
-                nodes.retain(|key, n| {
-                    if n.service_fullname == fullname {
-                        return false;
-                    }
-                    if let Some(hint) = node_id_hint {
-                        if key.starts_with(hint) {
-                            return false;
-                        }
-                    }
-                    n.manifest
-                        .node_name
-                        .as_deref()
-                        .map(|name| !fullname.contains(name))
-                        .unwrap_or(true)
-                });
+                // mDNS stacks can emit transient REMOVE events during refresh/re-announce.
+                // Keep nodes until stale timeout unless they truly stop broadcasting.
+                info!(
+                    service = %fullname,
+                    stale_timeout_secs = NODE_STALE_TIMEOUT_SECS,
+                    "LAND: service remove observed; waiting for stale timeout before eviction"
+                );
             }
             ServiceEvent::SearchStarted(_) => {
                 debug!("LAND: Search started");

@@ -357,12 +357,13 @@ pub struct PartialManifest {
 impl PartialManifest {
     /// Get the full API URL for this node.
     pub fn api_url(&self) -> Option<String> {
-        self.port.map(|p| format!("http://{}:{}", self.host, p))
+        self.port.map(|p| crate::endpoint_url(&self.host, p, false))
     }
 
     /// Get the dashboard URL for this node.
     pub fn dashboard_url(&self) -> Option<String> {
-        self.dashboard_port.map(|p| format!("http://{}:{}", self.host, p))
+        self.dashboard_port
+            .map(|p| crate::endpoint_url(&self.host, p, false))
     }
 }
 

@@ -49,6 +49,21 @@ pub const DEFAULT_API_PORT: u16 = 8419;
 /// Default dashboard port
 pub const DEFAULT_DASHBOARD_PORT: u16 = 8420;
 
+/// Format host for URL usage (adds brackets for raw IPv6 literals).
+pub fn format_host_for_url(host: &str) -> String {
+    if host.contains(':') && !host.starts_with('[') && !host.ends_with(']') {
+        format!("[{host}]")
+    } else {
+        host.to_string()
+    }
+}
+
+/// Build an HTTP(S) endpoint URL from host/port.
+pub fn endpoint_url(host: &str, port: u16, tls: bool) -> String {
+    let scheme = if tls { "https" } else { "http" };
+    format!("{scheme}://{}:{port}", format_host_for_url(host))
+}
+
 /// Get the local IP address of the machine.
 /// Falls back to 127.0.0.1 if discovery fails.
 pub fn get_local_ip() -> String {

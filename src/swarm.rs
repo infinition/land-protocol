@@ -158,7 +158,10 @@ impl SwarmState {
     pub fn heartbeat(&mut self, node_id: &Uuid) -> bool {
         if let Some(peer) = self.peers.get_mut(node_id) {
             peer.last_heartbeat = Utc::now();
-            if peer.status == PeerStatus::Suspect {
+            if matches!(
+                peer.status,
+                PeerStatus::Suspect | PeerStatus::Syncing | PeerStatus::Down
+            ) {
                 peer.status = PeerStatus::Active;
             }
             true
@@ -178,7 +181,12 @@ impl SwarmState {
             if elapsed > timeout_secs * 3 && peer.status != PeerStatus::Down {
                 peer.status = PeerStatus::Down;
                 unhealthy.push(*id);
-            } else if elapsed > timeout_secs && peer.status == PeerStatus::Active {
+            } else if elapsed > timeout_secs
+                && matches!(
+                    peer.status,
+                    PeerStatus::Active | PeerStatus::Busy | PeerStatus::Syncing
+                )
+            {
                 peer.status = PeerStatus::Suspect;
                 unhealthy.push(*id);
             }
@@ -331,6 +339,27 @@ mod tests {
         assert_eq!(total, 80);
     }
 
+    #[test]
+    fn test_syncing_becomes_active_on_heartbeat() {
+        let node_a = Uuid::new_v4();
+        let mut swarm = SwarmState::new_as_coordinator(
+            node_a, "laruche-a".into(), "192.168.1.10".into(), 8419, 8192, 16384,
+        );
+        let peer_id = Uuid::new_v4();
+        let manifest = PartialManifest {
+            node_id: Some(peer_id),
+            node_name: Some("laruche-b".into()),
+            host: "192.168.1.11".into(),
+            port: Some(8419),
+            ..default_partial()
+        };
+        swarm.add_peer(&manifest);
+        assert_eq!(swarm.peers.get(&peer_id).unwrap().status, PeerStatus::Syncing);
+
+        assert!(swarm.heartbeat(&peer_id));
+        assert_eq!(swarm.peers.get(&peer_id).unwrap().status, PeerStatus::Active);
+    }
+
     fn default_partial() -> PartialManifest {
         PartialManifest {
             protocol_version: None,
@@ -347,6 +376,7 @@ mod tests {
             in_swarm: false,
             peer_count: 0,
             is_coordinator: false,
+            model: None,
             host: String::new(),
         }
     }

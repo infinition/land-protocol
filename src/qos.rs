@@ -144,7 +144,13 @@ impl RequestQueue {
 
     /// Dequeue the next highest-priority request.
     pub fn dequeue(&mut self) -> Option<QueuedRequest> {
-        self.queue.pop()
+        let request = self.queue.pop()?;
+        match request.qos {
+            QosLevel::High => self.active_high += 1,
+            QosLevel::Normal => self.active_normal += 1,
+            QosLevel::Low => self.active_low += 1,
+        }
+        Some(request)
     }
 
     /// Mark a request as completed (decrement active counters).
@@ -159,6 +165,11 @@ impl RequestQueue {
     /// Current queue depth.
     pub fn depth(&self) -> usize {
         self.queue.len()
+    }
+
+    /// Number of in-flight requests by QoS level (high, normal, low).
+    pub fn active_counts(&self) -> (u32, u32, u32) {
+        (self.active_high, self.active_normal, self.active_low)
     }
 
     /// Check if degradation should be applied for this QoS level.
@@ -214,5 +225,25 @@ mod tests {
         assert_eq!(queue.dequeue().unwrap().qos, QosLevel::High);
         assert_eq!(queue.dequeue().unwrap().qos, QosLevel::Normal);
         assert_eq!(queue.dequeue().unwrap().qos, QosLevel::Low);
+    }
+
+    #[test]
+    fn test_active_counters() {
+        let mut queue = RequestQueue::new(QosPolicy::default());
+
+        queue.enqueue(make_request(QosLevel::High)).unwrap();
+        queue.enqueue(make_request(QosLevel::Normal)).unwrap();
+
+        let first = queue.dequeue().unwrap();
+        assert_eq!(first.qos, QosLevel::High);
+        assert_eq!(queue.active_counts(), (1, 0, 0));
+
+        let second = queue.dequeue().unwrap();
+        assert_eq!(second.qos, QosLevel::Normal);
+        assert_eq!(queue.active_counts(), (1, 1, 0));
+
+        queue.complete(QosLevel::High);
+        queue.complete(QosLevel::Normal);
+        assert_eq!(queue.active_counts(), (0, 0, 0));
     }
 }
