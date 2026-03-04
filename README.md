@@ -1,3 +1,8 @@
+<div align="center">
+<img height="300" alt="image" src="https://github.com/user-attachments/assets/32aae849-064a-40eb-b83e-170713664034" />
+</div>
+
+
 #  LAND Protocol (Local AI Network Discovery)
 
 > **"The HDMI of AI"**
