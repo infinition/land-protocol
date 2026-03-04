@@ -240,15 +240,14 @@ impl CognitiveManifest {
             ("dash_port".to_string(), self.api_endpoint.dashboard_port.to_string()),
         ];
 
+        // Add model info (primary model name)
+        if let Some(cap) = self.capabilities.capabilities.first() {
+            props.push(("model".to_string(), cap.model_name.clone()));
+        }
+
         // Add capability flags
         for flag in self.capabilities.to_flags() {
             props.push((flag, "1".to_string()));
-        }
-
-        // Add primary model name for LAND discovery (clients can display / route by model)
-        if let Some(first_cap) = self.capabilities.capabilities.first() {
-            let model = first_cap.model_name.chars().take(64).collect::<String>();
-            props.push(("model".to_string(), model));
         }
 
         // Add temperature if available
@@ -281,11 +280,11 @@ impl CognitiveManifest {
             port: None,
             dashboard_port: None,
             capabilities: Vec::new(),
-            model: None,
             temperature_c: None,
             in_swarm: false,
             peer_count: 0,
             is_coordinator: false,
+            model: None,
             host: host.to_string(),
         };
 
@@ -347,12 +346,11 @@ pub struct PartialManifest {
     pub port: Option<u16>,
     pub dashboard_port: Option<u16>,
     pub capabilities: Vec<crate::capabilities::Capability>,
-    /// Primary model name broadcast via TXT (e.g. "mistral", "deepseek-coder")
-    pub model: Option<String>,
     pub temperature_c: Option<f32>,
     pub in_swarm: bool,
     pub peer_count: u32,
     pub is_coordinator: bool,
+    pub model: Option<String>,
     pub host: String,
 }
 
@@ -416,6 +414,7 @@ mod tests {
 
         assert_eq!(partial.node_id, Some(manifest.node_id));
         assert_eq!(partial.node_name.as_deref(), Some("laruche-salon"));
+        assert_eq!(partial.model.as_deref(), Some("mistral-7b"));
         assert!(partial.capabilities.contains(&Capability::Llm));
         assert!(partial.capabilities.contains(&Capability::Rag));
     }
