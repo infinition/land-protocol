@@ -37,7 +37,7 @@ impl LandBroadcaster {
         let instance_name = format!("laruche-{}", &manifest.node_id.to_string()[..8]);
 
         // Build TXT record properties from the manifest
-        let properties: Vec<(&str, &str)> = Vec::new();
+        let _properties: Vec<(&str, &str)> = Vec::new();
         let txt_props = manifest.to_txt_properties();
         let txt_refs: Vec<(&str, &str)> = txt_props
             .iter()
@@ -69,7 +69,7 @@ impl LandBroadcaster {
 
     /// Update the broadcast with fresh manifest data (e.g., new load metrics).
     pub fn update(&self, manifest: &CognitiveManifest) -> Result<(), LandError> {
-        if let Some(ref fullname) = self.service_fullname {
+        if let Some(ref _fullname) = self.service_fullname {
             let instance_name = format!("laruche-{}", &manifest.node_id.to_string()[..8]);
             let txt_props = manifest.to_txt_properties();
             let txt_refs: Vec<(&str, &str)> = txt_props
@@ -143,7 +143,7 @@ impl LandListener {
         let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
         self.shutdown_tx = Some(shutdown_tx);
 
-        let daemon = self.daemon.clone();
+        let _daemon = self.daemon.clone();
 
         tokio::spawn(async move {
             info!("LAND: Listening for LaRuche nodes on the network...");

@@ -4,15 +4,18 @@
 
 A lightweight, local-first protocol for automatic discovery and communication between AI nodes on a local network.
 
-##  Why LAND?
+## Why LAND?
 
 In the current AI landscape, hardware is often siloed or cloud-dependent. **LAND** (Local AI Network Discovery) is an open standard that allows any device-from a tiny ESP32 to a multi-GPU server-to join a local "Collective Intelligence" without configuration, API keys, or internet access.
+
+- **Découverte :** mDNS sur le port UDP **5353** (assurez-vous qu'il soit ouvert sur votre machine).
+- **Transport :** TCP pour l'API cognitive (port par défaut 8419).
 
 It separates the **Standard** from the **Product**:
 - **LAND (The Standard):** An open language for AI nodes to find and talk to each other.
 - **LaRuche (The Product):** A premium implementation of this protocol.
 
-##  Core Features
+## Core Features
 
 - **Zero-Config Discovery:** Uses mDNS/DNS-SD to find peers instantly on the local network.
 - **Cognitive Manifest:** Every node broadcasts a rich profile:

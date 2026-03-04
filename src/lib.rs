@@ -48,3 +48,11 @@ pub const DEFAULT_API_PORT: u16 = 8419;
 
 /// Default dashboard port
 pub const DEFAULT_DASHBOARD_PORT: u16 = 8420;
+
+/// Get the local IP address of the machine.
+/// Falls back to 127.0.0.1 if discovery fails.
+pub fn get_local_ip() -> String {
+    local_ip_address::local_ip()
+        .map(|ip| ip.to_string())
+        .unwrap_or_else(|_| "127.0.0.1".to_string())
+}
