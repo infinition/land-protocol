@@ -1,43 +1,53 @@
-﻿# LAND Protocol
+<div align="center">
+<img height="300" alt="image" src="https://github.com/user-attachments/assets/32aae849-064a-40eb-b83e-170713664034" />
+</div>
 
-Local AI Network Discovery protocol used by LaRuche nodes and clients.
 
-## Purpose
+#  LAND Protocol (Local AI Network Discovery)
 
-LAND provides:
+> **"The HDMI of AI"**
 
-- Zero-config node discovery on LAN via mDNS/DNS-SD
-- Compact capability and load metadata broadcast (TXT records)
-- Swarm state helpers (peers, health, sharding)
-- QoS primitives for request prioritization
-- Proximity-auth primitives for local trust flows
+A lightweight, local-first protocol for automatic discovery and communication between AI nodes on a local network.
 
-## Transport and defaults
 
-- Service type: `_ai-inference._tcp.local.`
-- mDNS multicast: UDP `5353`
-- Default API port: `8419`
-- Default dashboard port: `8420`
+## Why LAND?
 
-## Crate modules
+In the current AI landscape, hardware is often siloed or cloud-dependent. **LAND** (Local AI Network Discovery) is an open standard that allows any device-from a tiny ESP32 to a multi-GPU server-to join a local "Collective Intelligence" without configuration, API keys, or internet access.
 
-- `capabilities`: typed capability model (`llm`, `vlm`, `code`, ...)
-- `manifest`: cognitive manifest + TXT encode/decode
-- `discovery`: `LandBroadcaster` and `LandListener`
-- `swarm`: peer health, swarm state, sharding planning
-- `qos`: queue + priority policy primitives
-- `auth`: proximity-based auth helpers
-- `error`: protocol error types
+- **Découverte :** mDNS sur le port UDP **5353** (assurez-vous qu'il soit ouvert sur votre machine).
+- **Transport :** TCP pour l'API cognitive (port par défaut 8419).
 
-## Discovery behavior (current)
+It separates the **Standard** from the **Product**:
+- **LAND (The Standard):** An open language for AI nodes to find and talk to each other.
+- **LaRuche (The Product):** A premium implementation of this protocol.
 
-- Listener stale timeout: `45s`
-- REMOVE mDNS events are treated as transient hints; eviction occurs on stale timeout
-- Broadcaster can be re-announced by calling `update(&manifest)` periodically
+## Core Features
 
-## Usage
+- **Zero-Config Discovery:** Uses mDNS/DNS-SD to find peers instantly on the local network.
+- **Cognitive Manifest:** Every node broadcasts a rich profile:
+    - **Physical Identity:** Node name, hardware tier (Nano, Core, Pro, Max).
+    - **Intelligence Menu:** Available models (LLM, VLM, RAG, Audio, Code).
+    - **Real-time Load:** Queue depth and tokens per second throughput.
+- **Proof of Proximity:** Secure physical-based authentication (NFC/Button press).
+- **Swarm Intelligence:** Built-in logic for resource sharing and resilience.
+- **Priority QoS:** Dedicated lanes for critical inference tasks.
 
-### Listener
+##  How it works
+
+The protocol identifies nodes via the mDNS service type `_ai-inference._tcp.local.`. Each node broadcasts a Gzipped JSON payload (the **Cognitive Manifest**) containing its current state. 
+
+Clients (apps, SDKs) listen for these broadcasts to build a real-time map of available local intelligence.
+
+##  Usage
+
+### Add as a dependency
+```toml
+[dependencies]
+land-protocol = { git = "https://github.com/infinition/land-protocol" }
+```
+
+### 1. Discovering Nodes (Client side)
+Use this if you are building an app or service that wants to use available AI nodes.
 
 ```rust
 use land_protocol::discovery::LandListener;
