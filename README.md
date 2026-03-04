@@ -4,6 +4,7 @@
 
 A lightweight, local-first protocol for automatic discovery and communication between AI nodes on a local network.
 
+
 ## Why LAND?
 
 In the current AI landscape, hardware is often siloed or cloud-dependent. **LAND** (Local AI Network Discovery) is an open standard that allows any device-from a tiny ESP32 to a multi-GPU server-to join a local "Collective Intelligence" without configuration, API keys, or internet access.
