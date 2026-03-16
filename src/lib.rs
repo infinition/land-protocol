@@ -31,7 +31,7 @@ pub use discovery::{LandBroadcaster, LandListener};
 pub use manifest::CognitiveManifest;
 pub use auth::{ProximityAuth, TrustCircle, AuthToken};
 pub use qos::{QosLevel, QosPolicy};
-pub use swarm::SwarmState;
+pub use swarm::{SwarmState, DistributedInferenceState, ShardingSummary};
 pub use error::LandError;
 
 /// LAND protocol version

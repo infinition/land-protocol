@@ -35,10 +35,10 @@ impl LandBroadcaster {
 
     /// Register this node on the network with the given manifest.
     pub fn register(&mut self, manifest: &CognitiveManifest) -> Result<(), LandError> {
-        let instance_name = format!("laruche-{}", &manifest.node_id.to_string()[..8]);
+        let uuid_str = manifest.node_id.to_string();
+        let instance_name = format!("laruche-{}", &uuid_str[..8]);
 
         // Build TXT record properties from the manifest
-        let _properties: Vec<(&str, &str)> = Vec::new();
         let txt_props = manifest.to_txt_properties();
         let txt_refs: Vec<(&str, &str)> = txt_props
             .iter()
@@ -70,8 +70,9 @@ impl LandBroadcaster {
 
     /// Update the broadcast with fresh manifest data (e.g., new load metrics).
     pub fn update(&self, manifest: &CognitiveManifest) -> Result<(), LandError> {
-        if let Some(ref _fullname) = self.service_fullname {
-            let instance_name = format!("laruche-{}", &manifest.node_id.to_string()[..8]);
+        if self.service_fullname.is_some() {
+            let uuid_str = manifest.node_id.to_string();
+            let instance_name = format!("laruche-{}", &uuid_str[..8]);
             let txt_props = manifest.to_txt_properties();
             let txt_refs: Vec<(&str, &str)> = txt_props
                 .iter()
@@ -144,8 +145,6 @@ impl LandListener {
         let nodes = self.nodes.clone();
         let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
         self.shutdown_tx = Some(shutdown_tx);
-
-        let _daemon = self.daemon.clone();
 
         tokio::spawn(async move {
             info!("LAND: Listening for LaRuche nodes on the network...");

@@ -354,6 +354,29 @@ pub struct PartialManifest {
     pub host: String,
 }
 
+impl Default for PartialManifest {
+    fn default() -> Self {
+        Self {
+            protocol_version: None,
+            node_id: None,
+            node_name: None,
+            tier: None,
+            tokens_per_sec: None,
+            memory_usage_pct: None,
+            queue_depth: None,
+            port: None,
+            dashboard_port: None,
+            capabilities: Vec::new(),
+            temperature_c: None,
+            in_swarm: false,
+            peer_count: 0,
+            is_coordinator: false,
+            model: None,
+            host: String::new(),
+        }
+    }
+}
+
 impl PartialManifest {
     /// Get the full API URL for this node.
     pub fn api_url(&self) -> Option<String> {
@@ -364,6 +387,18 @@ impl PartialManifest {
     pub fn dashboard_url(&self) -> Option<String> {
         self.dashboard_port
             .map(|p| crate::endpoint_url(&self.host, p, false))
+    }
+
+    /// Check if this manifest's protocol version is compatible.
+    pub fn is_version_compatible(&self) -> bool {
+        match &self.protocol_version {
+            Some(v) => {
+                let our_major = crate::PROTOCOL_VERSION.split('.').next().unwrap_or("0");
+                let their_major = v.split('.').next().unwrap_or("0");
+                our_major == their_major
+            }
+            None => true, // No version info = assume compatible
+        }
     }
 }
 

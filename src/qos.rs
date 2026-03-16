@@ -162,21 +162,33 @@ impl RequestQueue {
         }
     }
 
-    /// Current queue depth.
+    /// Current queue depth (waiting to be dequeued).
     pub fn depth(&self) -> usize {
         self.queue.len()
     }
 
     /// Number of in-flight requests by QoS level (high, normal, low).
+    /// In-flight = dequeued but not yet completed.
     pub fn active_counts(&self) -> (u32, u32, u32) {
         (self.active_high, self.active_normal, self.active_low)
     }
 
+    /// Total in-flight (dequeued but not completed) requests.
+    pub fn total_active(&self) -> u32 {
+        self.active_high + self.active_normal + self.active_low
+    }
+
+    /// Total load: in-flight + queued.
+    pub fn total_pending(&self) -> u32 {
+        self.total_active() + self.queue.len() as u32
+    }
+
     /// Check if degradation should be applied for this QoS level.
+    /// Uses both in-flight and queued counts for accurate saturation detection.
     pub fn should_degrade(&self, qos: QosLevel) -> bool {
         if qos == QosLevel::Low && self.policy.degrade_low_on_saturation {
-            let total_active = self.active_high + self.active_normal + self.active_low;
-            total_active > self.policy.max_normal_concurrent
+            self.total_active() >= self.policy.max_normal_concurrent
+                || self.queue.len() as u32 >= self.policy.max_queue_low / 2
         } else {
             false
         }
@@ -187,14 +199,16 @@ impl RequestQueue {
         self.policy.fallback_model.as_deref()
     }
 
-    /// Get the current accepting QoS level based on load.
+    /// Get the minimum QoS level currently being accepted based on load.
+    /// Returns `Low` when accepting all, `Normal` when saturated (only high+normal),
+    /// `High` when heavily saturated (only high priority).
     pub fn accepting_qos(&self) -> QosLevel {
         if self.active_high >= self.policy.max_high_concurrent {
-            QosLevel::High // Only accepting high priority
-        } else if self.active_normal >= self.policy.max_normal_concurrent {
-            QosLevel::Normal // Accepting high + normal
+            QosLevel::High
+        } else if self.active_normal + self.active_high >= self.policy.max_normal_concurrent {
+            QosLevel::Normal
         } else {
-            QosLevel::Low // Accepting all
+            QosLevel::Low
         }
     }
 }
