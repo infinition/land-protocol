@@ -4,6 +4,8 @@
 
 # LAND Protocol (Local AI Network Discovery)
 
+[![License](https://img.shields.io/badge/License-MIT%20%2F%20Apache%202.0-blue.svg)](LICENSE-MIT) ![Rust](https://img.shields.io/badge/Rust-000000?style=flat&logo=rust&logoColor=white) [![Ci](https://github.com/infinition/land-protocol/actions/workflows/ci.yml/badge.svg)](https://github.com/infinition/land-protocol/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/infinition/land-protocol?style=flat)](https://github.com/infinition/land-protocol/releases) [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/infinition)
+
 > **"The HDMI of AI"**
 
 A lightweight, local-first protocol for automatic discovery and communication between AI nodes on a local network.
@@ -103,3 +105,21 @@ async fn main() {
 - Prefer `PartialManifest::api_url()` / `dashboard_url()` over manual string formatting.
 - Use URL helpers for direct endpoint building, especially with IPv6 hosts.
 - If you use `RequestQueue`, pair `dequeue()` with `complete(qos)`.
+
+---
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=infinition%2Fland-protocol&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=infinition/land-protocol&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=infinition/land-protocol&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=infinition/land-protocol&type=date&legend=top-left" />
+ </picture>
+</a>
+
+---
+
+## License
+
+MIT or Apache-2.0 at your option.
