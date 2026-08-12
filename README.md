@@ -1,5 +1,6 @@
+
 <div align="center">
-<img height="300" alt="image" src="https://github.com/user-attachments/assets/32aae849-064a-40eb-b83e-170713664034" />
+<img width="370" height="384" alt="image-removebg-preview (1)" src="https://github.com/user-attachments/assets/71f78dca-441e-4f13-8093-02b2f32c657a" />
 </div>
 
 # LAND Protocol (Local AI Network Discovery)
