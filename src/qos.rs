@@ -4,10 +4,10 @@
 //! Higher priority requests get processed first; during saturation,
 //! lower priority requests can be degraded or queued.
 
-use serde::{Deserialize, Serialize};
-use std::collections::BinaryHeap;
-use std::cmp::Ordering;
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 use uuid::Uuid;
 
 /// Priority levels for requests on the LaRuche network.

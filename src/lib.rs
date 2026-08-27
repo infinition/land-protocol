@@ -18,21 +18,21 @@
 //!  └──────────────┘                          └──────────────┘
 //! ```
 
+pub mod auth;
 pub mod capabilities;
 pub mod discovery;
+pub mod error;
 pub mod manifest;
-pub mod auth;
 pub mod qos;
 pub mod swarm;
-pub mod error;
 
+pub use auth::{AuthToken, ProximityAuth, TrustCircle};
 pub use capabilities::Capability;
 pub use discovery::{LandBroadcaster, LandListener};
-pub use manifest::CognitiveManifest;
-pub use auth::{ProximityAuth, TrustCircle, AuthToken};
-pub use qos::{QosLevel, QosPolicy};
-pub use swarm::{SwarmState, DistributedInferenceState, ShardingSummary};
 pub use error::LandError;
+pub use manifest::CognitiveManifest;
+pub use qos::{QosLevel, QosPolicy};
+pub use swarm::{DistributedInferenceState, ShardingSummary, SwarmState};
 
 /// LAND protocol version
 pub const PROTOCOL_VERSION: &str = "0.1.0";

@@ -232,12 +232,27 @@ impl CognitiveManifest {
             ("land_v".to_string(), self.protocol_version.clone()),
             ("node_id".to_string(), self.node_id.to_string()),
             ("name".to_string(), self.node_name.clone()),
-            ("tier".to_string(), format!("{:?}", self.hardware_tier).to_lowercase()),
-            ("tps".to_string(), format!("{:.1}", self.performance.tokens_per_sec)),
-            ("mem_pct".to_string(), format!("{:.0}", self.memory_usage_pct())),
-            ("queue".to_string(), self.performance.queue_depth.to_string()),
+            (
+                "tier".to_string(),
+                format!("{:?}", self.hardware_tier).to_lowercase(),
+            ),
+            (
+                "tps".to_string(),
+                format!("{:.1}", self.performance.tokens_per_sec),
+            ),
+            (
+                "mem_pct".to_string(),
+                format!("{:.0}", self.memory_usage_pct()),
+            ),
+            (
+                "queue".to_string(),
+                self.performance.queue_depth.to_string(),
+            ),
             ("port".to_string(), self.api_endpoint.port.to_string()),
-            ("dash_port".to_string(), self.api_endpoint.dashboard_port.to_string()),
+            (
+                "dash_port".to_string(),
+                self.api_endpoint.dashboard_port.to_string(),
+            ),
         ];
 
         // Add model info (primary model name)
@@ -306,7 +321,7 @@ impl CognitiveManifest {
                 "coordinator" => manifest.is_coordinator = value == "1",
                 key if key.starts_with("capability:") => {
                     if let Some(cap) = crate::capabilities::Capability::from_flag(
-                        key.strip_prefix("capability:").unwrap_or("")
+                        key.strip_prefix("capability:").unwrap_or(""),
                     ) {
                         manifest.capabilities.push(cap);
                     }

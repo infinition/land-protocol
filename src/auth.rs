@@ -5,8 +5,8 @@
 //! LaRuche box or tapping it with NFC. This generates a signed auth token
 //! bound to a trust circle.
 
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc, Duration};
 use uuid::Uuid;
 
 /// Trust circles define access levels for authorized devices.
@@ -193,9 +193,7 @@ impl ProximityAuth {
     pub fn verify(&self, token_id: &Uuid) -> Option<&AuthToken> {
         let now = Utc::now();
         self.tokens.iter().find(|t| {
-            t.token_id == *token_id
-                && t.active
-                && t.expires_at.map(|e| e > now).unwrap_or(true)
+            t.token_id == *token_id && t.active && t.expires_at.map(|e| e > now).unwrap_or(true)
         })
     }
 
@@ -239,7 +237,7 @@ mod tests {
         let mut auth = ProximityAuth::new();
 
         // Device requests access
-        let pending = auth.request_auth(
+        let _pending = auth.request_auth(
             Uuid::new_v4(),
             "MacBook Pro de Jean".into(),
             TrustCircle::Family,
@@ -265,11 +263,8 @@ mod tests {
     #[test]
     fn test_guest_token_expires() {
         let mut auth = ProximityAuth::new();
-        let _pending = auth.request_auth(
-            Uuid::new_v4(),
-            "iPhone Visiteur".into(),
-            TrustCircle::Guest,
-        );
+        let _pending =
+            auth.request_auth(Uuid::new_v4(), "iPhone Visiteur".into(), TrustCircle::Guest);
         let token = auth.approve_pending().unwrap();
 
         assert!(token.expires_at.is_some()); // Guest = 24h expiry

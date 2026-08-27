@@ -121,7 +121,10 @@ impl CapabilitySet {
 
     /// Get the LAND flags for mDNS TXT record.
     pub fn to_flags(&self) -> Vec<String> {
-        self.capabilities.iter().map(|c| c.capability.as_flag()).collect()
+        self.capabilities
+            .iter()
+            .map(|c| c.capability.as_flag())
+            .collect()
     }
 }
 

@@ -100,19 +100,29 @@ impl LayerRange {
 
 impl SwarmState {
     /// Create a new swarm with this node as coordinator.
-    pub fn new_as_coordinator(node_id: Uuid, node_name: String, host: String, port: u16, vram_mb: u64, ram_mb: u64) -> Self {
+    pub fn new_as_coordinator(
+        node_id: Uuid,
+        node_name: String,
+        host: String,
+        port: u16,
+        vram_mb: u64,
+        ram_mb: u64,
+    ) -> Self {
         let mut peers = HashMap::new();
-        peers.insert(node_id, SwarmPeer {
+        peers.insert(
             node_id,
-            node_name,
-            host,
-            port,
-            vram_mb,
-            ram_mb,
-            last_heartbeat: Utc::now(),
-            status: PeerStatus::Active,
-            assigned_layers: None,
-        });
+            SwarmPeer {
+                node_id,
+                node_name,
+                host,
+                port,
+                vram_mb,
+                ram_mb,
+                last_heartbeat: Utc::now(),
+                status: PeerStatus::Active,
+                assigned_layers: None,
+            },
+        );
 
         Self {
             swarm_id: Uuid::new_v4(),
@@ -212,8 +222,15 @@ impl SwarmState {
     }
 
     /// Calculate a sharding configuration for a model across available peers.
-    pub fn plan_sharding(&self, model_name: &str, total_layers: u32, model_size_mb: u64) -> ShardingConfig {
-        let active_peers: Vec<&SwarmPeer> = self.peers.values()
+    pub fn plan_sharding(
+        &self,
+        model_name: &str,
+        total_layers: u32,
+        model_size_mb: u64,
+    ) -> ShardingConfig {
+        let active_peers: Vec<&SwarmPeer> = self
+            .peers
+            .values()
             .filter(|p| matches!(p.status, PeerStatus::Active | PeerStatus::Busy))
             .collect();
 
@@ -229,10 +246,13 @@ impl SwarmState {
                 current_layer + layers_per_peer - 1
             };
 
-            assignments.insert(peer.node_id, LayerRange {
-                start: current_layer,
-                end: end_layer,
-            });
+            assignments.insert(
+                peer.node_id,
+                LayerRange {
+                    start: current_layer,
+                    end: end_layer,
+                },
+            );
 
             current_layer = end_layer + 1;
         }
@@ -248,7 +268,8 @@ impl SwarmState {
 
     /// Get active peer count.
     pub fn active_peer_count(&self) -> usize {
-        self.peers.values()
+        self.peers
+            .values()
             .filter(|p| matches!(p.status, PeerStatus::Active | PeerStatus::Busy))
             .count()
     }
@@ -269,7 +290,9 @@ impl SwarmState {
 
     /// Check if the swarm has enough active peers with VRAM to shard a model.
     pub fn can_shard(&self, model_size_mb: u64) -> bool {
-        let active_vram: u64 = self.peers.values()
+        let active_vram: u64 = self
+            .peers
+            .values()
             .filter(|p| matches!(p.status, PeerStatus::Active | PeerStatus::Busy))
             .map(|p| p.vram_mb)
             .sum();
@@ -278,7 +301,9 @@ impl SwarmState {
 
     /// Get a list of active peers sorted by VRAM (descending) for sharding assignment.
     pub fn peers_by_vram(&self) -> Vec<&SwarmPeer> {
-        let mut peers: Vec<&SwarmPeer> = self.peers.values()
+        let mut peers: Vec<&SwarmPeer> = self
+            .peers
+            .values()
             .filter(|p| matches!(p.status, PeerStatus::Active | PeerStatus::Busy))
             .collect();
         peers.sort_by(|a, b| b.vram_mb.cmp(&a.vram_mb));
@@ -407,7 +432,11 @@ impl DistributedInferenceState {
         }
 
         // Check if all stages are complete
-        if self.stages.iter().all(|s| s.status == PipelineStageStatus::Completed) {
+        if self
+            .stages
+            .iter()
+            .all(|s| s.status == PipelineStageStatus::Completed)
+        {
             self.is_complete = true;
             self.completed_at = Some(Utc::now());
         }
@@ -499,10 +528,13 @@ impl SwarmState {
             };
 
             if layer_count > 0 {
-                assignments.insert(peer.node_id, LayerRange {
-                    start: current_layer,
-                    end: current_layer + layer_count - 1,
-                });
+                assignments.insert(
+                    peer.node_id,
+                    LayerRange {
+                        start: current_layer,
+                        end: current_layer + layer_count - 1,
+                    },
+                );
                 current_layer += layer_count;
             }
         }
@@ -624,7 +656,12 @@ mod tests {
     fn test_swarm_formation() {
         let node_a = Uuid::new_v4();
         let mut swarm = SwarmState::new_as_coordinator(
-            node_a, "laruche-a".into(), "192.168.1.10".into(), 8419, 8192, 16384,
+            node_a,
+            "laruche-a".into(),
+            "192.168.1.10".into(),
+            8419,
+            8192,
+            16384,
         );
 
         assert_eq!(swarm.active_peer_count(), 1);
@@ -647,29 +684,35 @@ mod tests {
     fn test_sharding_plan() {
         let node_a = Uuid::new_v4();
         let mut swarm = SwarmState::new_as_coordinator(
-            node_a, "laruche-a".into(), "192.168.1.10".into(), 8419, 4096, 8192,
+            node_a,
+            "laruche-a".into(),
+            "192.168.1.10".into(),
+            8419,
+            4096,
+            8192,
         );
 
         let node_b = Uuid::new_v4();
-        swarm.peers.insert(node_b, SwarmPeer {
-            node_id: node_b,
-            node_name: "laruche-b".into(),
-            host: "192.168.1.11".into(),
-            port: 8419,
-            vram_mb: 4096,
-            ram_mb: 8192,
-            last_heartbeat: Utc::now(),
-            status: PeerStatus::Active,
-            assigned_layers: None,
-        });
+        swarm.peers.insert(
+            node_b,
+            SwarmPeer {
+                node_id: node_b,
+                node_name: "laruche-b".into(),
+                host: "192.168.1.11".into(),
+                port: 8419,
+                vram_mb: 4096,
+                ram_mb: 8192,
+                last_heartbeat: Utc::now(),
+                status: PeerStatus::Active,
+                assigned_layers: None,
+            },
+        );
 
         let config = swarm.plan_sharding("llama-70b", 80, 40000);
         assert_eq!(config.assignments.len(), 2);
 
         // Total layers should cover all 80
-        let total: u32 = config.assignments.values()
-            .map(|r| r.count())
-            .sum();
+        let total: u32 = config.assignments.values().map(|r| r.count()).sum();
         assert_eq!(total, 80);
     }
 
@@ -677,7 +720,12 @@ mod tests {
     fn test_syncing_becomes_active_on_heartbeat() {
         let node_a = Uuid::new_v4();
         let mut swarm = SwarmState::new_as_coordinator(
-            node_a, "laruche-a".into(), "192.168.1.10".into(), 8419, 8192, 16384,
+            node_a,
+            "laruche-a".into(),
+            "192.168.1.10".into(),
+            8419,
+            8192,
+            16384,
         );
         let peer_id = Uuid::new_v4();
         let manifest = PartialManifest {
@@ -688,32 +736,46 @@ mod tests {
             ..PartialManifest::default()
         };
         swarm.add_peer(&manifest);
-        assert_eq!(swarm.peers.get(&peer_id).unwrap().status, PeerStatus::Syncing);
+        assert_eq!(
+            swarm.peers.get(&peer_id).unwrap().status,
+            PeerStatus::Syncing
+        );
 
         assert!(swarm.heartbeat(&peer_id));
-        assert_eq!(swarm.peers.get(&peer_id).unwrap().status, PeerStatus::Active);
+        assert_eq!(
+            swarm.peers.get(&peer_id).unwrap().status,
+            PeerStatus::Active
+        );
     }
 
     #[test]
     fn test_vram_proportional_sharding() {
         let node_a = Uuid::new_v4();
         let mut swarm = SwarmState::new_as_coordinator(
-            node_a, "laruche-a".into(), "192.168.1.10".into(), 8419, 8192, 16384,
+            node_a,
+            "laruche-a".into(),
+            "192.168.1.10".into(),
+            8419,
+            8192,
+            16384,
         );
 
         // Node B has half the VRAM
         let node_b = Uuid::new_v4();
-        swarm.peers.insert(node_b, SwarmPeer {
-            node_id: node_b,
-            node_name: "laruche-b".into(),
-            host: "192.168.1.11".into(),
-            port: 8419,
-            vram_mb: 4096,
-            ram_mb: 8192,
-            last_heartbeat: Utc::now(),
-            status: PeerStatus::Active,
-            assigned_layers: None,
-        });
+        swarm.peers.insert(
+            node_b,
+            SwarmPeer {
+                node_id: node_b,
+                node_name: "laruche-b".into(),
+                host: "192.168.1.11".into(),
+                port: 8419,
+                vram_mb: 4096,
+                ram_mb: 8192,
+                last_heartbeat: Utc::now(),
+                status: PeerStatus::Active,
+                assigned_layers: None,
+            },
+        );
 
         let config = swarm.plan_sharding_by_vram("llama-70b", 80, 40000);
         assert_eq!(config.assignments.len(), 2);
@@ -721,7 +783,10 @@ mod tests {
         // Node A (8GB VRAM) should get ~53 layers, Node B (4GB) ~27
         let a_layers = config.assignments.get(&node_a).unwrap();
         let b_layers = config.assignments.get(&node_b).unwrap();
-        assert!(a_layers.count() > b_layers.count(), "Higher VRAM peer should get more layers");
+        assert!(
+            a_layers.count() > b_layers.count(),
+            "Higher VRAM peer should get more layers"
+        );
 
         // Total layers must cover all 80
         assert_eq!(a_layers.count() + b_layers.count(), 80);
@@ -731,21 +796,29 @@ mod tests {
     fn test_activate_deactivate_sharding() {
         let node_a = Uuid::new_v4();
         let mut swarm = SwarmState::new_as_coordinator(
-            node_a, "laruche-a".into(), "192.168.1.10".into(), 8419, 4096, 8192,
+            node_a,
+            "laruche-a".into(),
+            "192.168.1.10".into(),
+            8419,
+            4096,
+            8192,
         );
 
         let node_b = Uuid::new_v4();
-        swarm.peers.insert(node_b, SwarmPeer {
-            node_id: node_b,
-            node_name: "laruche-b".into(),
-            host: "192.168.1.11".into(),
-            port: 8419,
-            vram_mb: 4096,
-            ram_mb: 8192,
-            last_heartbeat: Utc::now(),
-            status: PeerStatus::Active,
-            assigned_layers: None,
-        });
+        swarm.peers.insert(
+            node_b,
+            SwarmPeer {
+                node_id: node_b,
+                node_name: "laruche-b".into(),
+                host: "192.168.1.11".into(),
+                port: 8419,
+                vram_mb: 4096,
+                ram_mb: 8192,
+                last_heartbeat: Utc::now(),
+                status: PeerStatus::Active,
+                assigned_layers: None,
+            },
+        );
 
         // Activate
         let config = swarm.activate_sharding("mistral-7b", 32, 4000);
@@ -790,7 +863,12 @@ mod tests {
         // Process stages
         state.stage_processing(&node_a);
         assert_eq!(
-            state.stages.iter().find(|s| s.peer_id == node_a).unwrap().status,
+            state
+                .stages
+                .iter()
+                .find(|s| s.peer_id == node_a)
+                .unwrap()
+                .status,
             PipelineStageStatus::Processing
         );
 
@@ -811,7 +889,12 @@ mod tests {
     fn test_estimated_speedup() {
         let node_a = Uuid::new_v4();
         let mut swarm = SwarmState::new_as_coordinator(
-            node_a, "laruche-a".into(), "192.168.1.10".into(), 8419, 4096, 8192,
+            node_a,
+            "laruche-a".into(),
+            "192.168.1.10".into(),
+            8419,
+            4096,
+            8192,
         );
 
         // 1 node: no speedup
@@ -820,46 +903,60 @@ mod tests {
         // Add 2 more peers
         for i in 0..2 {
             let id = Uuid::new_v4();
-            swarm.peers.insert(id, SwarmPeer {
-                node_id: id,
-                node_name: format!("peer-{i}"),
-                host: format!("192.168.1.{}", 11 + i),
-                port: 8419,
-                vram_mb: 4096,
-                ram_mb: 8192,
-                last_heartbeat: Utc::now(),
-                status: PeerStatus::Active,
-                assigned_layers: None,
-            });
+            swarm.peers.insert(
+                id,
+                SwarmPeer {
+                    node_id: id,
+                    node_name: format!("peer-{i}"),
+                    host: format!("192.168.1.{}", 11 + i),
+                    port: 8419,
+                    vram_mb: 4096,
+                    ram_mb: 8192,
+                    last_heartbeat: Utc::now(),
+                    status: PeerStatus::Active,
+                    assigned_layers: None,
+                },
+            );
         }
 
         // 3 nodes: ~2.7x speedup (1.0 + 2 * 0.85)
         let speedup = swarm.estimated_speedup();
-        assert!(speedup > 2.5 && speedup < 2.8, "Expected ~2.7x, got {speedup}");
+        assert!(
+            speedup > 2.5 && speedup < 2.8,
+            "Expected ~2.7x, got {speedup}"
+        );
     }
 
     #[test]
     fn test_can_shard() {
         let node_a = Uuid::new_v4();
         let mut swarm = SwarmState::new_as_coordinator(
-            node_a, "laruche-a".into(), "192.168.1.10".into(), 8419, 4096, 8192,
+            node_a,
+            "laruche-a".into(),
+            "192.168.1.10".into(),
+            8419,
+            4096,
+            8192,
         );
 
         // 1 node can't shard (need >= 2)
         assert!(!swarm.can_shard(4000));
 
         let node_b = Uuid::new_v4();
-        swarm.peers.insert(node_b, SwarmPeer {
-            node_id: node_b,
-            node_name: "laruche-b".into(),
-            host: "192.168.1.11".into(),
-            port: 8419,
-            vram_mb: 4096,
-            ram_mb: 8192,
-            last_heartbeat: Utc::now(),
-            status: PeerStatus::Active,
-            assigned_layers: None,
-        });
+        swarm.peers.insert(
+            node_b,
+            SwarmPeer {
+                node_id: node_b,
+                node_name: "laruche-b".into(),
+                host: "192.168.1.11".into(),
+                port: 8419,
+                vram_mb: 4096,
+                ram_mb: 8192,
+                last_heartbeat: Utc::now(),
+                status: PeerStatus::Active,
+                assigned_layers: None,
+            },
+        );
 
         // 2 nodes with 8192 MB total: can shard 4000 MB model
         assert!(swarm.can_shard(4000));
