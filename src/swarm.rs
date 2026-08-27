@@ -306,7 +306,7 @@ impl SwarmState {
             .values()
             .filter(|p| matches!(p.status, PeerStatus::Active | PeerStatus::Busy))
             .collect();
-        peers.sort_by(|a, b| b.vram_mb.cmp(&a.vram_mb));
+        peers.sort_by_key(|a| std::cmp::Reverse(a.vram_mb));
         peers
     }
 
